@@ -153,6 +153,7 @@ sudo virt-install \
   --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
   --boot hd,cdrom\
   --network network=${network},mac=${rendezvousMAC} \
+  --os-variant generic \
   --noautoconsole &
 
 ### 8. Wait for the installation to complete
