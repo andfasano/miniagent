@@ -36,8 +36,19 @@ cd $assets_dir
 echo "* Working dir set to ${assets_dir}"
 
 ### 3. Get the openshift-installer
-echo "* Extracting openshift-install from ${releaseImage}"
-oc adm release extract --registry-config ${pullSecretFile} --command=openshift-install --to=${assets_dir} ${releaseImage}
+if [[ -z "${CUSTOM_INSTALLER_PATH}" ]]; then
+  # Extract the installer from the release image
+  echo "* Extracting openshift-install from ${releaseImage}"
+  oc adm release extract --registry-config ${pullSecretFile} --command=openshift-install --to=${assets_dir} ${releaseImage}
+else
+  # Installer was built from src, let's patch the version
+  version=$(oc adm release info --registry-config ${pullSecretFile} ${releaseImage} -o json | jq -r ".metadata.version")
+  cp ${CUSTOM_INSTALLER_PATH}/openshift-install ${assets_dir}
+  res=$(grep -oba ._RELEASE_VERSION_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX ${assets_dir}/openshift-install)
+  location=${res%%:*}
+  echo "* Patching openshift-install with version ${version}"
+  printf "${version}\0" | dd of=${assets_dir}/openshift-install bs=1 seek=${location} conv=notrunc &> /dev/null 
+fi
 
 ### 4. Configure network, add a static mac and ip for the sno node.
 ###    Some useful notes:
@@ -133,7 +144,7 @@ EOF
 
 ### 6. Build the agent ISO.
 echo "* Creating agent ISO"
-./openshift-install agent create image --dir=${assets_dir}
+OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${releaseImage} ./openshift-install agent create image --dir=${assets_dir} --log-level=debug
 
 ### 7. Start the agent virtual machine 
 if $(sudo virsh list --all | grep "\s${hostname}\s" &> /dev/null); then
