@@ -5,8 +5,8 @@ set -euo pipefail
 if [ $# -lt 1 ]; then
     echo "./sno-setup.sh <release image> [pull secret path]"
     echo "Usage example:"
-    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.12.15-x86_64 # This works if REGISTRY_AUTH_FILE is already set"
-    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.12.15-x86_64 ~/config/my-pull-secret"
+    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.13.0-x86_64 # This works if REGISTRY_AUTH_FILE is already set"
+    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.13.0-x86_64 ~/config/my-pull-secret"
 
     exit 1
 fi
@@ -148,8 +148,8 @@ sudo virt-install \
   --connect 'qemu:///system' \
   -n ${hostname} \
   --vcpus 8 \
-  --memory 32678 \
-  --disk pool=default,size=100,bus=scsi \
+  --memory 24576 \
+  --disk size=100,bus=virtio,cache=none,io=native \
   --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
   --boot hd,cdrom\
   --network network=${network},mac=${rendezvousMAC} \
