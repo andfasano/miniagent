@@ -18,7 +18,7 @@ if [ $# -eq 2 ]; then
 fi
 
 network=miniagent                     # This the name of the network that will be created 
-hostname=agent-sno                    # The hostname of the SNO instance
+name=agent-sno                        # The name of the SNO instance
 rendezvousIP=192.168.133.10           # In case of SNO, this is also the host IP
 rendezvousMAC=52:54:00:93:72:25       # In case of SNO, this is also the host MAC
 
@@ -146,26 +146,76 @@ EOF
 echo "* Creating agent ISO"
 OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${releaseImage} ./openshift-install agent create image --dir=${assets_dir} --log-level=debug
 
-### 7. Start the agent virtual machine 
-if $(sudo virsh list --all | grep "\s${hostname}\s" &> /dev/null); then
-  echo "* Removing previous ${hostname} instance"
-  sudo virsh destroy ${hostname}
-  sudo virsh undefine ${hostname}
+### 7. Create and start the agent virtual machine 
+if $(sudo virsh list --all | grep "\s${name}\s" &> /dev/null); then
+  echo "* Removing previous ${name} instance"
+  sudo virsh destroy ${name}
+  sudo virsh undefine ${name}
 fi
 
 echo "* Launching agent SNO virtual machine"
 sudo chmod a+x ${assets_dir}
-sudo virt-install \
-  --connect 'qemu:///system' \
-  -n ${hostname} \
-  --vcpus 8 \
-  --memory 24576 \
-  --disk size=100,bus=virtio,cache=none,io=native \
-  --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
-  --boot hd,cdrom\
-  --network network=${network},mac=${rendezvousMAC} \
-  --os-variant generic \
-  --noautoconsole &
+# sudo virt-install \
+#   --connect 'qemu:///system' \
+#   -n ${name} \
+#   --vcpus 8 \
+#   --memory 24576 \
+#   --disk size=100,bus=virtio,cache=none,io=native \
+#   --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
+#   --boot hd,cdrom\
+#   --network network=${network},mac=${rendezvousMAC} \
+#   --os-variant generic \
+#   --noautoconsole &
+
+img=/var/lib/libvirt/images/${name}.qcow2
+vm=${assets_dir}/{name}.xml
+
+cat > ${vm} << EOF
+<domain type='kvm'>
+  <name>${name}</name>
+  <memory unit='KiB'>24576000</memory>
+  <vcpu placement='static'>8</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc-i440fx-rhel7.6.0'>hvm</type>
+    <boot dev='hd' />
+    <boot dev='cdrom'/>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+    <vmport state="off"/>
+  </features>
+  <cpu mode="host-model" check="partial"/>  
+  <devices>
+    <disk type="file" device="disk">
+      <driver name="qemu" type="qcow2" cache="none" io="native"/>
+      <source file="${img}"/>
+      <target dev="vda" bus="virtio"/>
+      <address type="pci" domain="0x0000" bus="0x00" slot="0x04" function="0x0"/>
+    </disk>
+    <disk type="file" device="cdrom">
+      <driver name="qemu" type="raw"/>
+      <source file="${assets_dir}/agent.x86_64.iso"/>
+      <target dev="sda" bus="ide"/>
+      <readonly/>
+      <address type="drive" controller="0" bus="0" target="0" unit="0"/>
+    </disk>
+    <interface type="network">
+      <mac address="${rendezvousMAC}"/>
+      <source network="${network}"/>
+      <model type="e1000"/>
+      <address type="pci" domain="0x0000" bus="0x00" slot="0x03" function="0x0"/>
+    </interface>
+     <graphics type='spice' autoport='yes'>
+      <listen type='address'/>
+    </graphics>
+  </devices>
+</domain>
+EOF
+
+sudo qemu-img create -f qcow2 ${img} 100G
+sudo virsh define ${vm}
+sudo virsh start ${name}
 
 ### 8. Wait for the installation to complete
 ${assets_dir}/openshift-install agent wait-for install-complete --dir=${assets_dir} --log-level=debug
