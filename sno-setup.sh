@@ -165,7 +165,7 @@ cat > ${vm} << EOF
   <memory unit='KiB'>24576000</memory>
   <vcpu placement='static'>8</vcpu>
   <os>
-    <type arch='x86_64' machine='pc-i440fx'>hvm</type>
+    <type arch='x86_64'>hvm</type>
     <boot dev='hd' />
     <boot dev='cdrom'/>
   </os>
