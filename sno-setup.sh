@@ -155,20 +155,9 @@ fi
 
 echo "* Launching agent SNO virtual machine"
 sudo chmod a+x ${assets_dir}
-# sudo virt-install \
-#   --connect 'qemu:///system' \
-#   -n ${name} \
-#   --vcpus 8 \
-#   --memory 24576 \
-#   --disk size=100,bus=virtio,cache=none,io=native \
-#   --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
-#   --boot hd,cdrom\
-#   --network network=${network},mac=${rendezvousMAC} \
-#   --os-variant generic \
-#   --noautoconsole &
 
 img=/var/lib/libvirt/images/${name}.qcow2
-vm=${assets_dir}/{name}.xml
+vm=${assets_dir}/${name}.xml
 
 cat > ${vm} << EOF
 <domain type='kvm'>
@@ -176,7 +165,7 @@ cat > ${vm} << EOF
   <memory unit='KiB'>24576000</memory>
   <vcpu placement='static'>8</vcpu>
   <os>
-    <type arch='x86_64' machine='pc-i440fx-rhel7.6.0'>hvm</type>
+    <type arch='x86_64' machine='pc-i440fx'>hvm</type>
     <boot dev='hd' />
     <boot dev='cdrom'/>
   </os>
@@ -213,6 +202,7 @@ cat > ${vm} << EOF
 </domain>
 EOF
 
+rm -rf ${img} || true
 sudo qemu-img create -f qcow2 ${img} 100G
 sudo virsh define ${vm}
 sudo virsh start ${name}
