@@ -36,7 +36,7 @@ cd $assets_dir
 echo "* Working dir set to ${assets_dir}"
 
 ### 3. Get the openshift-installer
-if [[ -z "${CUSTOM_INSTALLER_PATH}" ]]; then
+if [[ -z "${CUSTOM_INSTALLER_PATH:-}" ]]; then
   # Extract the installer from the release image
   echo "* Extracting openshift-install from ${releaseImage}"
   oc adm release extract --registry-config ${pullSecretFile} --command=openshift-install --to=${assets_dir} ${releaseImage}
