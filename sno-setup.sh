@@ -17,10 +17,14 @@ if [ $# -eq 2 ]; then
   pullSecretFile=$2
 fi
 
-network=miniagent                     # This the name of the network that will be created 
+network=mini-agent-ocp                # This the name of the network that will be created 
 hostname=agent-sno                    # The hostname of the SNO instance
 rendezvousIP=192.168.133.10           # In case of SNO, this is also the host IP
 rendezvousMAC=52:54:00:93:72:25       # In case of SNO, this is also the host MAC
+
+baseDomain=${network}.org
+domain=sno.${baseDomain}
+apiDomain=api.${domain}
 
 ### 1. Get the oc binary. 
 ###    This will not only be used to extract the the openshift-install binary itself from the release payload,
@@ -41,13 +45,13 @@ oc adm release extract --registry-config ${pullSecretFile} --command=openshift-i
 
 ### 4. Configure network, add a static mac and ip for the sno node.
 ###    Some useful notes:
-###    - The domain 'sno.miniagent.org' is local to the network and will not propagate upstream.
-###    - The api DNS record `api.sno.miniagent.org` points directly to SNO itself
+###    - The domain 'sno.mini-agent-ocp.org' is local to the network and will not propagate upstream.
+###    - The api DNS record `api.sno.mini-agent-ocp.org` points directly to SNO itself
 ###    - SNO instance is configured with a static IP and MAC (so that they will be reused later when generating install config files)
 if ! $(sudo virsh net-list | grep ${network} &> /dev/null); then
   echo "* Creating ${network} network"
 
-  cat > ${assets_dir}/miniagent.xml << EOF
+  cat > ${assets_dir}/${network}.xml << EOF
 <network>
   <name>${network}</name>
   <forward mode="nat">
@@ -57,11 +61,11 @@ if ! $(sudo virsh net-list | grep ${network} &> /dev/null); then
   </forward>
   <bridge name="virbr-sno" stp="on" delay="0"/>
   <mac address="52:54:00:94:43:21"/>
-  <domain name="sno.miniagent.org" localOnly="yes"/>
+  <domain name="${domain}" localOnly="yes"/>
   <dns>
     <host ip="${rendezvousIP}">
-      <hostname>master-0.sno.miniagent.org</hostname>
-      <hostname>api.sno.miniagent.org</hostname>
+      <hostname>master-0.${domain}</hostname>
+      <hostname>${apiDomain}</hostname>
     </host>
   </dns>
   <ip address="192.168.133.1" netmask="255.255.255.0">
@@ -73,15 +77,15 @@ if ! $(sudo virsh net-list | grep ${network} &> /dev/null); then
 </network>
 EOF
 
-  sudo virsh net-define ${assets_dir}/miniagent.xml
+  sudo virsh net-define ${assets_dir}/${network}.xml
   sudo virsh net-start ${network}
 fi
 
 ###    The guest inside the agent network will not be resolvable from the host,
 ###    and this will be required later by the wait-for command
-if ! $(grep "api.sno.miniagent.org" /etc/hosts &> /dev/null); then
+if ! $(grep "${apiDomain}" /etc/hosts &> /dev/null); then
   echo "* Adding entry to /etc/hosts"
-  echo "${rendezvousIP} api.sno.miniagent.org" | sudo tee -a /etc/hosts
+  echo "${rendezvousIP} ${apiDomain}" | sudo tee -a /etc/hosts
 fi
 
 ### 5. Generate the install-config.yaml and agent-config.yaml.
@@ -100,7 +104,7 @@ pullSecret=$(echo $(cat $pullSecretFile))
 
 cat > ${assets_dir}/install-config.yaml << EOF
 apiVersion: v1
-baseDomain: miniagent.org
+baseDomain: ${baseDomain}
 metadata:
   name: sno
   namespace: ocp
