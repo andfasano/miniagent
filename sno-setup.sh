@@ -12,7 +12,7 @@ if [ $# -lt 1 ]; then
 fi
 
 releaseImage=$1
-pullSecretFile=${REGISTRY_AUTH_FILE}
+pullSecretFile=${REGISTRY_AUTH_FILE:-}
 if [ $# -eq 2 ]; then
   pullSecretFile=$2
 fi
@@ -40,8 +40,16 @@ cd $assets_dir
 echo "* Working dir set to ${assets_dir}"
 
 ### 3. Get the openshift-installer
+extractOptions="--command=openshift-install --to=${assets_dir} ${releaseImage}"
+
+pullSecret='{"auths": {"empty": {"auth": "ZW1wdHkK"}}}'
+if [ ! -z ${pullSecretFile} ]; then
+  pullSecret=$(echo $(cat $pullSecretFile)) 
+  extractOptions="--registry-config=${pullSecretFile} ${extractOptions}"
+fi
+
 echo "* Extracting openshift-install from ${releaseImage}"
-oc adm release extract --registry-config ${pullSecretFile} --command=openshift-install --to=${assets_dir} ${releaseImage}
+oc adm release extract ${extractOptions}
 
 ### 4. Configure network, add a static mac and ip for the sno node.
 ###    Some useful notes:
@@ -100,7 +108,6 @@ rendezvousIP: ${rendezvousIP}
 EOF
 
 sshKey=$(echo $(cat ~/.ssh/id_rsa.pub))
-pullSecret=$(echo $(cat $pullSecretFile)) 
 
 cat > ${assets_dir}/install-config.yaml << EOF
 apiVersion: v1
@@ -155,7 +162,8 @@ sudo virt-install \
   --memory 24576 \
   --disk size=100,bus=virtio,cache=none,io=native \
   --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
-  --boot hd,cdrom\
+  --boot hd,cdrom \
+  --import \
   --network network=${network},mac=${rendezvousMAC} \
   --os-variant generic \
   --noautoconsole &
