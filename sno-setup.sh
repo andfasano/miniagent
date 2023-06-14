@@ -42,7 +42,7 @@ echo "* Working dir set to ${assets_dir}"
 ### 3. Get the openshift-installer
 extractOptions="--command=openshift-install --to=${assets_dir} ${releaseImage}"
 
-pullSecret='{"auths": {"empty": {"auth": "ZW1wdHkK"}}}'
+pullSecret='{"auths": {"empty": {"auth": "ZW1wdHk6ZW1wdHkK"}}}' ### empty secret
 if [ ! -z ${pullSecretFile} ]; then
   pullSecret=$(echo $(cat $pullSecretFile)) 
   extractOptions="--registry-config=${pullSecretFile} ${extractOptions}"
