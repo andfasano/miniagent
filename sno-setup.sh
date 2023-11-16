@@ -164,4 +164,4 @@ sudo virt-install \
 ${assets_dir}/openshift-install agent wait-for install-complete --dir=${assets_dir} --log-level=debug
 
 end=$(date +%s)
-echo "Cluster deployed in $(((end - start / 60)) minutes"
+echo "Cluster deployed in $(((end - start) / 60)) minutes"
