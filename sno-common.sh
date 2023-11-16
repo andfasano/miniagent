@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This file contains just the variables shared 
+# between the setup/cleanup scripts
+
 assets_dir=/tmp/mini-agent            # Temporary folder to store all the files required to perform the installation
 network=mini-agent                    # This the name of the network that will be created 
 hostname=agent-sno                    # The hostname of the SNO instance

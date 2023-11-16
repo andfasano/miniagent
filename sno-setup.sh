@@ -7,8 +7,8 @@ source "sno-common.sh"
 if [ $# -lt 1 ]; then
     echo "./sno-setup.sh <release image> [pull secret path]"
     echo "Usage example:"
-    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.13.0-x86_64 # This works if REGISTRY_AUTH_FILE is already set"
-    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.13.0-x86_64 ~/config/my-pull-secret"
+    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 # This works if REGISTRY_AUTH_FILE is already set"
+    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/config/my-pull-secret"
 
     exit 1
 fi
@@ -164,4 +164,5 @@ sudo virt-install \
 ${assets_dir}/openshift-install agent wait-for install-complete --dir=${assets_dir} --log-level=debug
 
 end=$(date +%s)
+echo ""
 echo "Cluster deployed in $(((end - start) / 60)) minutes"
