@@ -160,7 +160,14 @@ sudo virt-install \
   --os-variant generic \
   --noautoconsole &
 
-### 9. Wait for the installation to complete
+
+### 9. Check if the agent virtual machine is up and running
+while ! $(sudo virsh list --all | grep "\s${hostname}\s.*running" &> /dev/null); do
+  echo "Waiting for ${hostname} to start..."
+  sleep 5
+done
+
+### 10. Wait for the installation to complete
 ${assets_dir}/openshift-install agent wait-for install-complete --dir=${assets_dir} --log-level=debug
 
 end=$(date +%s)
