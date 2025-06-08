@@ -12,6 +12,15 @@ if sudo virsh list --all --name | grep -q "${hostname}"; then
   sudo virsh undefine ${hostname} --remove-all-storage
 fi
 
+# Remove any existing worker
+if sudo virsh list --all --name | grep -q "${workerName}"; then
+  echo "* Removing ${workerName} instance"
+  if sudo virsh list --name | grep -q "${workerName}"; then
+      sudo virsh destroy ${workerName}
+  fi
+  sudo virsh undefine ${workerName} --remove-all-storage
+fi
+
 # Remove the mini-agent network
 if sudo virsh net-list --all --name | grep -q ${network}; then
   echo "* Removing ${network} network"

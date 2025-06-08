@@ -5,39 +5,21 @@ source "sno-common.sh"
 
 ### 1. Initial checks 
 if [ $# -lt 1 ]; then
-    echo "./sno-setup.sh <release image> [pull secret path]"
+    echo "./sno-setup.sh <release image>"
     echo "Usage example:"
-    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 # This works if REGISTRY_AUTH_FILE is already set"
-    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/config/my-pull-secret"
+    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64"
 
     exit 1
 fi
 
 releaseImage=$1
-pullSecretFile=${REGISTRY_AUTH_FILE:-}
-if [ $# -eq 2 ]; then
-  pullSecretFile=$2
-fi
 
-if [ -z "${pullSecretFile}" ]; then
-  pullSecretFile=~/.docker/config.json
-  if [ ! -e "${pullSecretFile}" ]; then
-    read -rsp 'Pull secret: ' pullSecret
-    echo
-    mkdir -p ~/.docker
-    echo "$pullSecret" > ~/.docker/config.json
-  fi
+sshKeyFileBase=~/.ssh/id_miniagent
+if [ ! -e $sshKeyFileBase ]; then
+  echo "Generating mini-agent SSH key..."
+  ssh-keygen -N "" -t rsa -f $sshKeyFileBase
 fi
-
-if [ -e ~/.ssh/id_ed25519.pub ]; then
-  sshKeyFile=~/.ssh/id_ed25519.pub
-elif [ -e ~/.ssh/id_rsa.pub ]; then
-  sshKeyFile=~/.ssh/id_rsa.pub
-else
-  echo "Generating SSH key..."
-  echo | ssh-keygen -N "" -t rsa
-  sshKeyFile=~/.ssh/id_rsa.pub
-fi
+sshKeyFile=${sshKeyFileBase}.pub
 
 if [ -d "${assets_dir}" ] || sudo virsh list --all --name | grep -q "${hostname}" || sudo virsh net-list | grep -q ${network}; then
   echo "Found existing miniagent state, please run sno-cleanup.sh first"
@@ -59,9 +41,6 @@ fi
 
 ### 4. Get the openshift-installer
 extractOptions="--command=openshift-install --to=${assets_dir} ${releaseImage}"
-
-pullSecret=$(echo $(cat $pullSecretFile))
-extractOptions="--registry-config=${pullSecretFile} ${extractOptions}"
 
 echo "* Extracting openshift-install from ${releaseImage}"
 oc adm release extract ${extractOptions}
@@ -88,12 +67,17 @@ cat > ${assets_dir}/${network}.xml << EOF
     <host ip="${rendezvousIP}">
       <hostname>master-0.${domain}</hostname>
       <hostname>${apiDomain}</hostname>
+      <hostname>${apiIntDomain}</hostname>
+    </host>
+    <host ip="${workerIP}">
+      <hostname>worker-0.${domain}</hostname>
     </host>
   </dns>
   <ip address="192.168.133.1" netmask="255.255.255.0">
     <dhcp>
       <range start="192.168.133.80" end="192.168.133.254"/>
       <host mac="${rendezvousMAC}" name="master-0" ip="${rendezvousIP}"/>
+      <host mac="${workerMAC}" name="worker-0" ip="${workerIP}"/>
     </dhcp>
   </ip>
 </network>
@@ -149,7 +133,7 @@ networking:
     - 172.30.0.0/16
 platform:
     none: {}
-pullSecret: '${pullSecret}'
+pullSecret: '{"auths":{"":{"auth":"dXNlcjpwYXNz"}}}'
 sshKey: ${sshKey}
 EOF
 
@@ -164,7 +148,7 @@ sudo virt-install \
   --connect 'qemu:///system' \
   -n ${hostname} \
   --vcpus 8 \
-  --memory 16384 \
+  --memory 32768 \
   --disk size=100,bus=virtio,cache=none,io=native \
   --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
   --boot hd,cdrom \
@@ -173,12 +157,26 @@ sudo virt-install \
   --os-variant rhel9-unknown \
   --noautoconsole &
 
-
 ### 9. Check if the agent virtual machine is up and running
 while ! sudo virsh list --all | grep -q "\s${hostname}\s.*running"; do
   echo "Waiting for ${hostname} to start..."
   sleep 5
 done
+
+### Worker node creation
+virt-install \
+  --connect 'qemu:///system' \
+  -n ${workerName} \
+  --vcpus 8 \
+  --memory 24576 \
+  --disk size=100,bus=virtio,cache=none,io=native \
+  --disk path=${assets_dir}/node.x86_64.iso,device=cdrom,bus=sata,size=2 \
+  --boot hd,cdrom \
+  --import \
+  --network network=${network},mac=${workerMAC} \
+  --os-variant rhel9-unknown \
+  --noautoconsole \
+  --noreboot
 
 ### 10. Wait for the installation to complete
 ${assets_dir}/openshift-install agent wait-for install-complete --dir=${assets_dir} --log-level=debug
