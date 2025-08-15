@@ -205,21 +205,15 @@ ${assets_dir}/openshift-install agent wait-for install-complete --dir=${assets_d
 
 ### 12. Post-installation persistence steps (if requested)
 if [ "$persist_mode" = "true" ]; then
-    echo "* Copying kubeconfig to persistent location"
+    echo "* Copying kubeconfig to /var/lib/miniagent/kubeconfig"
     sudo mkdir -p /var/lib/miniagent
     sudo cp ${assets_dir}/auth/kubeconfig /var/lib/miniagent/kubeconfig
     sudo chmod 644 /var/lib/miniagent/kubeconfig
-    echo "  Kubeconfig saved to: /var/lib/miniagent/kubeconfig"
     
     echo "* Detaching installation ISO"
     sudo virsh detach-disk ${hostname} ${assets_dir}/agent.x86_64.iso --config
-    echo "  ISO detached - VM will boot from persistent disk"
     
-    echo ""
-    echo "=== PERSISTENCE ENABLED ==="
-    echo "Cluster will survive host reboots."
-    echo "To access cluster after reboot: export KUBECONFIG=/var/lib/miniagent/kubeconfig"
-    echo "=========================="
+    echo "To access the cluster run: export KUBECONFIG=/var/lib/miniagent/kubeconfig"
 fi
 end=$(date +%s)
 echo ""
