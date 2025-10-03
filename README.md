@@ -33,7 +33,7 @@ $ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/confi
 INFO Cluster is installed                         
 INFO Install complete!                            
 INFO To access the cluster as the system:admin user when using 'oc', run 
-INFO     export KUBECONFIG=/tmp/agent-DvM/auth/kubeconfig 
+INFO     export KUBECONFIG=/tmp/mini-agent/auth/kubeconfig
 ...
 ```
 
@@ -42,7 +42,7 @@ INFO     export KUBECONFIG=/tmp/agent-DvM/auth/kubeconfig
 3. Connect to your new cluster using the credentials stored in the asset folder.
 
 ``` bash
-$ export KUBECONFIG=/tmp/agent/auth/kubeconfig
+$ export KUBECONFIG=/tmp/mini-agent/auth/kubeconfig
 $ oc get nodes
 NAME       STATUS   ROLES                         AGE   VERSION
 master-0   Ready    control-plane,master,worker   36m   v1.26.3+b404935
