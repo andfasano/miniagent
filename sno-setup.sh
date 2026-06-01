@@ -5,21 +5,25 @@ source "sno-common.sh"
 
 ### 1. Initial checks 
 if [ $# -lt 1 ]; then
-    echo "./sno-setup.sh <release image> [pull secret path] [--persist]"
+    echo "./sno-setup.sh <release image> [pull secret path] [--persist] [--memory <GB>]"
     echo "Usage example:"
     echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 # This works if REGISTRY_AUTH_FILE is already set"
     echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/config/my-pull-secret"
     echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/config/my-pull-secret --persist # Survive reboots"
+    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 --memory 16 # Use 16 GB RAM"
 
     exit 1
 fi
 
-# Check if --persist flag is present
+# Parse flags
 persist_mode=false
-for arg in "$@"; do
-    if [ "$arg" = "--persist" ]; then
+memory_mb=20480
+args=("$@")
+for i in "${!args[@]}"; do
+    if [ "${args[$i]}" = "--persist" ]; then
         persist_mode=true
-        break
+    elif [ "${args[$i]}" = "--memory" ]; then
+        memory_mb=$(( ${args[$((i+1))]} * 1024 ))
     fi
 done
 
@@ -179,7 +183,7 @@ sudo virt-install \
   --connect 'qemu:///system' \
   -n ${hostname} \
   --vcpus 8 \
-  --memory 20480 \
+  --memory ${memory_mb} \
   --disk size=100,bus=virtio,cache=none,io=native \
   --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
   --boot hd,cdrom \
