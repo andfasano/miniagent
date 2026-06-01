@@ -29,8 +29,8 @@ done
 
 releaseImage=$1
 pullSecretFile=${REGISTRY_AUTH_FILE:-}
-# Handle pull secret from $2, accounting for possible --persist flag
-if [ $# -eq 2 ] || [ $# -eq 3 ]; then
+# Handle pull secret from $2, if it doesn't look like a flag
+if [ $# -ge 2 ] && [[ "$2" != --* ]]; then
   pullSecretFile=$2
 fi
 
