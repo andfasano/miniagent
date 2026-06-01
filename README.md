@@ -26,6 +26,12 @@ $ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/confi
 
 > **_NOTE:_**  The pull secret file parameter is not required if the `REGISTRY_AUTH_FILE` environment variable is already set
 
+For clusters that should survive host reboots, add the `--persist` flag:
+
+``` bash
+$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/config/my-pull-secret --persist
+```
+
 2. Wait for the installation to complete. The console will show a detailed output about each phase of the installation.
 
 ``` bash
@@ -41,6 +47,7 @@ INFO     export KUBECONFIG=/tmp/mini-agent/auth/kubeconfig
 
 3. Connect to your new cluster using the credentials stored in the asset folder.
 
+**Default mode (ephemeral):**
 ``` bash
 $ export KUBECONFIG=/tmp/mini-agent/auth/kubeconfig
 $ oc get nodes
@@ -48,7 +55,23 @@ NAME       STATUS   ROLES                         AGE   VERSION
 master-0   Ready    control-plane,master,worker   36m   v1.26.3+b404935
 ```
 
-4. Once done, to remove the cluster and cleanup the enviroment, run the cleanup script
+**Persistent mode (with `--persist` flag):**
+``` bash
+$ export KUBECONFIG=/var/lib/miniagent/kubeconfig
+$ oc get nodes
+NAME       STATUS   ROLES                         AGE   VERSION
+master-0   Ready    control-plane,master,worker   36m   v1.26.3+b404935
+```
+
+4. Once done, to remove the cluster and cleanup the environment, run the cleanup script
 ``` bash
 $ ./sno-cleanup.sh
 ```
+
+## Persistence Mode
+
+By default, miniagent creates ephemeral clusters for quick testing that do not survive host reboots. Use the `--persist` flag to enable reboot survival features:
+
+- **Network and VM autostart**: Automatically start after host reboot
+- **Installation ISO detachment**: Eliminates dependency on /tmp files
+- **Persistent kubeconfig**: Saved to `/var/lib/miniagent/kubeconfig`

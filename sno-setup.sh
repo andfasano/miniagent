@@ -5,17 +5,32 @@ source "sno-common.sh"
 
 ### 1. Initial checks 
 if [ $# -lt 1 ]; then
-    echo "./sno-setup.sh <release image> [pull secret path]"
+    echo "./sno-setup.sh <release image> [pull secret path] [--persist] [--memory <GB>]"
     echo "Usage example:"
     echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 # This works if REGISTRY_AUTH_FILE is already set"
     echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/config/my-pull-secret"
+    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 ~/config/my-pull-secret --persist # Survive reboots"
+    echo "$ ./sno-setup.sh quay.io/openshift-release-dev/ocp-release:4.14.3-x86_64 --memory 16 # Use 16 GB RAM"
 
     exit 1
 fi
 
+# Parse flags
+persist_mode=false
+memory_mb=20480
+args=("$@")
+for i in "${!args[@]}"; do
+    if [ "${args[$i]}" = "--persist" ]; then
+        persist_mode=true
+    elif [ "${args[$i]}" = "--memory" ]; then
+        memory_mb=$(( ${args[$((i+1))]} * 1024 ))
+    fi
+done
+
 releaseImage=$1
 pullSecretFile=${REGISTRY_AUTH_FILE:-}
-if [ $# -eq 2 ]; then
+# Handle pull secret from $2, if it doesn't look like a flag
+if [ $# -ge 2 ] && [[ "$2" != --* ]]; then
   pullSecretFile=$2
 fi
 
@@ -101,6 +116,10 @@ EOF
 
 sudo virsh net-define ${assets_dir}/${network}.xml
 sudo virsh net-start ${network}
+if [ "$persist_mode" = "true" ]; then
+    echo "* Enabling network autostart for persistence"
+    sudo virsh net-autostart ${network}
+fi
 
 ###    The guest inside the agent network will not be resolvable from the host,
 ###    and this will be required later by the wait-for command
@@ -164,7 +183,7 @@ sudo virt-install \
   --connect 'qemu:///system' \
   -n ${hostname} \
   --vcpus 8 \
-  --memory 16384 \
+  --memory ${memory_mb} \
   --disk size=100,bus=virtio,cache=none,io=native \
   --disk path=${assets_dir}/agent.x86_64.iso,device=cdrom,bus=sata \
   --boot hd,cdrom \
@@ -173,16 +192,33 @@ sudo virt-install \
   --os-variant rhel9-unknown \
   --noautoconsole &
 
-
 ### 9. Check if the agent virtual machine is up and running
 while ! sudo virsh list --all | grep -q "\s${hostname}\s.*running"; do
   echo "Waiting for ${hostname} to start..."
   sleep 5
 done
 
-### 10. Wait for the installation to complete
+### 10. Enable VM autostart for persistence across reboots (if requested)
+if [ "$persist_mode" = "true" ]; then
+    echo "* Enabling VM autostart"
+    sudo virsh autostart ${hostname}
+fi
+
+### 11. Wait for the installation to complete
 ${assets_dir}/openshift-install agent wait-for install-complete --dir=${assets_dir} --log-level=debug
 
+### 12. Post-installation persistence steps (if requested)
+if [ "$persist_mode" = "true" ]; then
+    echo "* Copying kubeconfig to /var/lib/miniagent/kubeconfig"
+    sudo mkdir -p /var/lib/miniagent
+    sudo cp ${assets_dir}/auth/kubeconfig /var/lib/miniagent/kubeconfig
+    sudo chmod 644 /var/lib/miniagent/kubeconfig
+    
+    echo "* Detaching installation ISO"
+    sudo virsh detach-disk ${hostname} ${assets_dir}/agent.x86_64.iso --config
+    
+    echo "To access the cluster run: export KUBECONFIG=/var/lib/miniagent/kubeconfig"
+fi
 end=$(date +%s)
 echo ""
 echo "Cluster deployed in $(((end - start) / 60)) minutes"
